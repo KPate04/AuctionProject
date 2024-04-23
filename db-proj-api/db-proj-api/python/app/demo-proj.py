@@ -31,11 +31,6 @@ def db_connection():
     
     return db
 
-
-
-
-
-
 ##########################################################
 ## ENDPOINTS
 ##########################################################
@@ -45,13 +40,54 @@ def db_connection():
 def landing_page():
     return """
 
-    Hello World (Python)!  <br/>
+    Hello World xxxxxx (Python)!  <br/>
     <br/>
     Check the sources for instructions on how to use the endpoints!<br/>
     <br/>
     ITCS 3160-002, Spring 2024<br/>
     <br/>
     """
+
+##
+## Demo GET
+##
+## Obtain all users in JSON format
+##
+## To use it, access:
+##
+## http://localhost:8080/auction/
+##
+
+@app.route('/auction/', methods=['GET'])
+def get_all_auctiosn():
+    logger.info('GET /auction')
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute('SELECT auctionid, auction_end, sellerdesc FROM auction')
+        rows = cur.fetchall()
+
+        logger.debug('GET /auction - parse')
+        Results = []
+        for row in rows:
+            logger.debug(row)
+            content = {'auctionid': row[0], 'auction_end': row[1], 'sellerdesc': row[2]}
+            Results.append(content)  # appending to the payload to be returned
+
+        response = {'status': StatusCodes['success'], 'results': Results}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'GET /auction - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
+
 
 ##
 ## Demo GET
@@ -71,14 +107,14 @@ def get_all_users():
     cur = conn.cursor()
 
     try:
-        cur.execute('SELECT username, name, city FROM users')
+        cur.execute('SELECT userid, password, usertype FROM users')
         rows = cur.fetchall()
 
         logger.debug('GET /users - parse')
         Results = []
         for row in rows:
             logger.debug(row)
-            content = {'username': row[0], 'name': row[1], 'city': row[2]}
+            content = {'userid': row[0], 'password': row[1], 'usertype': row[2]}
             Results.append(content)  # appending to the payload to be returned
 
         response = {'status': StatusCodes['success'], 'results': Results}
@@ -101,32 +137,32 @@ def get_all_users():
 ##
 ## To use it, access:
 ##
-## http://localhost:8080/users/ssmith
+## http://localhost:8080/users/1
 ##
 
-@app.route('/users/<username>/', methods=['GET'])
-def get_user(username):
-    logger.info('GET /users/<username>')
+@app.route('/users/<userid>/', methods=['GET'])
+def get_user(userid):
+    logger.info('GET /users/<userid>')
 
-    logger.debug('username: {username}')
+    logger.debug('userid: {userid}')
 
     conn = db_connection()
     cur = conn.cursor()
 
     try:
-        cur.execute('SELECT username, name, city FROM users where username = %s', (username,))
+        cur.execute('SELECT userid, password, usertype FROM users where userid = %s', (userid,))
         rows = cur.fetchall()
 
         row = rows[0]
 
-        logger.debug('GET /users/<username> - parse')
+        logger.debug('GET /users/<userid> - parse')
         logger.debug(row)
-        content = {'username': row[0], 'name': row[1], 'city': row[2]}
+        content = {'userid': row[0], 'password': row[1], 'usertype': row[2]}
 
         response = {'status': StatusCodes['success'], 'results': content}
 
     except (Exception, psycopg2.DatabaseError) as error:
-        logger.error(f'GET /users/<username> - error: {error}')
+        logger.error(f'GET /users/<userid> - error: {error}')
         response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
 
     finally:
@@ -143,7 +179,7 @@ def get_user(username):
 ##
 ## To use it, you need to use postman or curl:
 ##
-## curl -X POST http://localhost:8080/users/ -H 'Content-Type: application/json' -d '{"city": "London", "username": "ppopov", "name": "Peter Popov"}'
+## curl -X POST http://localhost:8080/users/ -H 'Content-Type: application/json' -d '{"usertype": "buyer", "userid": "1", "password": "petey4life"}'
 ##
 
 @app.route('/users/', methods=['POST'])
@@ -157,20 +193,26 @@ def add_users():
     logger.debug(f'POST /users - payload: {payload}')
 
     # do not forget to validate every argument, e.g.,:
-    if 'username' not in payload:
-        response = {'status': StatusCodes['api_error'], 'results': 'username value not in payload'}
+    if 'userid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'userid value not in payload'}
+        return flask.jsonify(response)
+    if 'password' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'password value not in payload'}
+        return flask.jsonify(response)
+    if 'usertype' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'usertype value not in payload'}
         return flask.jsonify(response)
 
     # parameterized queries, good for security and performance
-    statement = 'INSERT INTO users (username, name, city) VALUES (%s, %s, %s)'
-    values = (payload['username'], payload['city'], payload['name'])
+    statement = 'INSERT INTO users (userid, password, usertype) VALUES (%s, %s, %s)'
+    values = (payload['userid'], payload['password'], payload['usertype'])
 
     try:
         cur.execute(statement, values)
 
         # commit the transaction
         conn.commit()
-        response = {'status': StatusCodes['success'], 'results': f'Inserted users {payload["username"]}'}
+        response = {'status': StatusCodes['success'], 'results': f'Inserted users {payload["userid"]}'}
 
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(f'POST /users - error: {error}')
@@ -193,27 +235,33 @@ def add_users():
 ##
 ## To use it, you need to use postman or curl:
 ##
-## curl -X PUT http://localhost:8080/users/ssmith -H 'Content-Type: application/json' -d '{"city": "Raleigh"}'
+## curl -X PUT http://localhost:8080/users/1 -H 'Content-Type: application/json' -d '{"userid":"1","password":"petey4life","usertype": "seller"}'
 ##
 
-@app.route('/users/<username>', methods=['PUT'])
-def update_users(username):
-    logger.info('PUT /users/<username>')
+@app.route('/users/<userid>', methods=['PUT'])
+def update_users(userid):
+    logger.info('PUT /users/<userid>')
     payload = flask.request.get_json()
 
     conn = db_connection()
     cur = conn.cursor()
 
-    logger.debug(f'PUT /users/<username> - payload: {payload}')
+    logger.debug(f'PUT /users/<userid> - payload: {payload}')
 
     # do not forget to validate every argument, e.g.,:
-    if 'city' not in payload:
-        response = {'status': StatusCodes['api_error'], 'results': 'city is required to update'}
+    if 'usertype' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'usertype is required to update'}
+        return flask.jsonify(response)
+    if 'userid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'userid is required to update'}
+        return flask.jsonify(response)
+    if 'password' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'password is required to update'}
         return flask.jsonify(response)
 
     # parameterized queries, good for security and performance
-    statement = 'UPDATE users SET city = %s WHERE username = %s'
-    values = (payload['city'], username)
+    statement = 'UPDATE users SET usertype = %s WHERE userid = %s'
+    values = (payload['usertype'], userid)
 
     try:
         res = cur.execute(statement, values)
@@ -236,8 +284,128 @@ def update_users(username):
     return flask.jsonify(response)
 
 
+##
+## Demo POST
+##
+## Add a new user in a JSON payload
+##
+## To use it, you need to use postman or curl:
+##
+## curl -X POST http://localhost:8080/auction/ -H 'Content-Type: application/json' -d '{"auctionid": "0", "auction_end": "20240613", "sellerdesc": "pretty vase very pretty plz buy", "items_itemid":"0", "seller_users_userid": "1"}'
+##
 
+@app.route('/auction/', methods=['POST'])
+def add_auction():
+    logger.info('POST /auction')
+    payload = flask.request.get_json()
 
+    conn = db_connection()
+    cur = conn.cursor()
+    import time
+    time.strftime('%Y-%m-%d %H:%M:%S')
+
+    logger.debug(f'POST /auction - payload: {payload}')
+
+    # do not forget to validate every argument, e.g.,:
+    if 'auctionid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'auctionid value not in payload'}
+        return flask.jsonify(response)
+    if 'auction_end' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'auction_end value not in payload'}
+        return flask.jsonify(response)
+    if 'sellerdesc' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'sellerdesc value not in payload'}
+        return flask.jsonify(response)
+    if 'items_itemid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'item_itemid value not in payload'}
+        return flask.jsonify(response)
+    if 'seller_users_userid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'seller_users_userid value not in payload'}
+        return flask.jsonify(response)
+
+    # parameterized queries, good for security and performance
+    statement = 'INSERT INTO auction (auctionid, auction_end, sellerdesc, items_itemid, seller_users_userid) VALUES (%s, %s, %s, %s, %s)'
+    values = (payload['auctionid'], payload['auction_end'], payload['sellerdesc'], payload['items_itemid'], payload['seller_users_userid'])
+
+    try:
+        cur.execute(statement, values)
+
+        # commit the transaction
+        conn.commit()
+        response = {'status': StatusCodes['success'], 'results': f'Inserted auction {payload["auctionid"]}'}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'POST /auction - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+        # an error occurred, rollback
+        conn.rollback()
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
+
+##
+## Demo POST
+##
+## Add a new user in a JSON payload
+##
+## To use it, you need to use postman or curl:
+##
+## curl -X POST http://localhost:8080/items/ -H 'Content-Type: application/json' -d '{"itemid": "0", "name": "pretty vase wow", "bid_amt": "5000", "seller_users_userid": "1"}'
+##
+
+@app.route('/items/', methods=['POST'])
+def add_items():
+    logger.info('POST /items')
+    payload = flask.request.get_json()
+
+    conn = db_connection()
+    cur = conn.cursor()
+    import time
+    time.strftime('%Y-%m-%d %H:%M:%S')
+
+    logger.debug(f'POST /items - payload: {payload}')
+
+    # do not forget to validate every argument, e.g.,:
+    if 'itemid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'itemid value not in payload'}
+        return flask.jsonify(response)
+    if 'name' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'name value not in payload'}
+        return flask.jsonify(response)
+    if 'bid_amt' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'bid_amt value not in payload'}
+        return flask.jsonify(response)
+    if 'seller_users_userid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'seller_users_userid value not in payload'}
+        return flask.jsonify(response)
+
+    # parameterized queries, good for security and performance
+    statement = 'INSERT INTO items (itemid, name, bid_amt, seller_users_userid) VALUES (%s, %s, %s, %s)'
+    values = (payload['itemid'], payload['name'], payload['bid_amt'], payload['seller_users_userid'])
+
+    try:
+        cur.execute(statement, values)
+
+        # commit the transaction
+        conn.commit()
+        response = {'status': StatusCodes['success'], 'results': f'Inserted auction {payload["itemid"]}'}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'POST /items - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+        # an error occurred, rollback
+        conn.rollback()
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
 
 ##########################################################
 ## MAIN
