@@ -31,6 +31,97 @@ def db_connection():
     
     return db
 
+
+##########################################################
+## TOKEN VERIFICATION
+##########################################################
+
+# Simpole token (shown in class)
+
+def token_required(f):
+    @wraps(f)
+    def decorator(*args, **kwargs):
+        token = None
+
+        if 'access-token' in flask.request.headers:
+            token = flask.request.headers['access-token']
+
+        if not token:
+            return flask.jsonify({'message': 'invalid token'})
+
+        try:
+            conn = db_connection()
+            cur = conn.cursor()
+            cur.execute("delete from tokens where \
+               timeout<current_timestamp")
+            conn.commit()
+
+            cur.execute("select username from tokens \
+               where token= %s",(token,))
+
+            if cur.rowcount==0:
+                return flask.jsonify({'message': \
+                   'invalid token'})
+            else:
+                current_user=cur.fetchone()[0]
+        except (Exception) as error:
+            logger.error(f'POST /users - error: {error}')
+            conn.rollback()
+
+            return flask.jsonify({'message': 'invalid token'})
+
+        return f(current_user, *args, **kwargs)
+
+    return decorator
+
+
+# login user using simple tokens
+# curl -X PUT http://localhost:8080/login -H 'Content-Type: application/json' -d '{"username": "ssmith", "password": "ssmith_pass"}'
+
+@app.route('/login', methods=['PUT'])
+def login_user():
+    auth = flask.request.get_json()
+
+    if not auth or 'username' not in auth \
+    or 'password' not in auth:
+        return flask.make_response('missing credentials', 401)
+
+    try:
+        conn = db_connection()
+        cur = conn.cursor()
+
+        statement = 'select 1 from users \
+           where username = %s and password = %s'
+        values = (auth['username'], auth['password'])
+
+        cur.execute(statement, values)
+
+        if cur.rowcount==0:
+           response = ('could not verify', 401)
+        else:
+            response = auth['username']+ \
+               str(random.randrange(111111111,999999999))
+            
+            statement = "insert into tokens values( %s, %s , \
+               current_timestamp + (60 * interval '1 min'))"
+            values = (auth['username'], response)
+
+            cur.execute(statement, values)    
+
+        conn.commit()
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'POST /users - error: {error}')
+        response = {'status': \
+           StatusCodes['internal_error'], \
+           'errors': str(error)}
+
+        conn.rollback()
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return response 
+
 ##########################################################
 ## ENDPOINTS
 ##########################################################
