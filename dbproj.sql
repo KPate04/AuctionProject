@@ -7,7 +7,6 @@ CREATE TABLE items (
 );
 
 CREATE TABLE buyer (
-	buyerid	 BIGSERIAL,
 	bid_amt	 DOUBLE PRECISION,
 	bids_bidid	 BIGINT NOT NULL,
 	users_userid BIGINT,
@@ -15,7 +14,6 @@ CREATE TABLE buyer (
 );
 
 CREATE TABLE seller (
-	sellerid	 BIGSERIAL,
 	min_price	 DOUBLE PRECISION,
 	auction_end	 TIMESTAMP,
 	users_userid BIGINT,
@@ -24,6 +22,7 @@ CREATE TABLE seller (
 
 CREATE TABLE auction (
 	auctionid		 BIGSERIAL,
+	auctiontitle	 VARCHAR(512),
 	auction_end	 TIMESTAMP,
 	sellerdesc		 VARCHAR(512),
 	items_itemid	 BIGINT NOT NULL,
@@ -83,4 +82,3 @@ ALTER TABLE bids_auction ADD CONSTRAINT bids_auction_fk1 FOREIGN KEY (bids_bidid
 ALTER TABLE bids_auction ADD CONSTRAINT bids_auction_fk2 FOREIGN KEY (auction_auctionid) REFERENCES auction(auctionid);
 ALTER TABLE buyer_items ADD CONSTRAINT buyer_items_fk1 FOREIGN KEY (buyer_users_userid) REFERENCES buyer(users_userid);
 ALTER TABLE buyer_items ADD CONSTRAINT buyer_items_fk2 FOREIGN KEY (items_itemid) REFERENCES items(itemid);
-
