@@ -174,12 +174,35 @@ def add_users():
 
     # parameterized queries, good for security and performance
     if payload['usertype'] == 'seller':
-        statement = 'INSERT INTO sellers (users_userid) VALUES (%s)'
+        statement_seller = 'INSERT INTO sellers (users_userid) VALUES (%s)'
+        values_seller = (payload['userid'],)
+        try:
+            cur.execute(statement, values)
+            cur.execute(statement_seller, values_seller)
+            # commit the transaction
+            conn.commit()
+            response = {'status': StatusCodes['success'], 'results': f'Inserted seller {payload["userid"]}'}
+        except (Exception, psycopg2.DatabaseError) as error:
+            logger.error(f'POST /users - error: {error}')
+            response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+            # an error occurred, rollback
+            conn.rollback()
     elif payload['usertype'] == 'buyer':
-        statement = 'INSERT INTO buyers (users_userid) VALUES (%s)'
+        statement_buyer = 'INSERT INTO buyers (users_userid) VALUES (%s)'
+        values_buyer = (payload['userid'],)
+        try:
+            cur.execute(statement, values)
+            cur.execute(statement_buyer, values_buyer)
+            # commit the transaction
+            conn.commit()
+            response = {'status': StatusCodes['success'], 'results': f'Inserted buyer {payload["userid"]}'}
+        except (Exception, psycopg2.DatabaseError) as error:
+            logger.error(f'POST /users - error: {error}')
+            response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+            # an error occurred, rollback
+            conn.rollback()
     else:
-        response = {'status': 'api_error', 'results': 'Invalid usertype'}    
-        # values = (payload['userid'], payload['password'], payload['usertype'])
+        response = {'status': 'api_error', 'results': 'Invalid usertype'}
 
     try:
         cur.execute(statement, values)
