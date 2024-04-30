@@ -579,6 +579,8 @@ def edit_auction(auctionId):
 
 ## FUNCTIONS THAT ARE NOT NEEDED IN THE FINAL PROJECT
 
+
+
 ## USERS
 ## Demo GET
 ##
@@ -1505,6 +1507,72 @@ def add_items():
 #             conn.close()
 
 #     return flask.jsonify(response)
+
+
+
+@app.route('/buyers', methods=['GET'])
+def get_all_buyers():
+    logger.info('GET /buyers')
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute('SELECT * FROM buyers')
+        rows = cur.fetchall()
+
+        buyers = []
+        for row in rows:
+            buyer = {
+                'buyerid': row[0],
+                'buyername': row[1],
+                'buyeremail': row[2]
+            }
+            buyers.append(buyer)
+
+        response = {'status': StatusCodes['success'], 'results': buyers}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'GET /buyers - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
+
+
+@app.route('/sellers', methods=['GET'])
+def get_all_sellers():
+    logger.info('GET /sellers')
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute('SELECT * FROM seller')
+        rows = cur.fetchall()
+
+        sellers = []
+        for row in rows:
+            seller = {
+                'sellerid': row[0],
+                'sellername': row[1],
+                'selleremail': row[2]
+            }
+            sellers.append(seller)
+
+        response = {'status': StatusCodes['success'], 'results': sellers}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'GET /buyers - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
 
 
 # ##########################################################
