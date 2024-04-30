@@ -38,7 +38,7 @@ def db_connection():
 ## TOKEN VERIFICATION
 ##########################################################
 
-# Simpole token (shown in class)
+# Simple token (shown in class)
 
 def token_required(f):
     @wraps(f)
@@ -142,25 +142,20 @@ def landing_page():
     <br/>
     """
 
-## USERS
-## Demo POST
+## Sign-up
 ##
-## Add a new user in a JSON payload
-##
-## To use it, you need to use postman or curl:
-##
-## curl -X POST http://localhost:8080/users/ -H 'Content-Type: application/json' -d '{"usertype": "buyer", "userid": "0", "password": "petey4life"}'
+## curl -X POST http://localhost:8080/user -H 'Content-Type: application/json' -d '{"usertype": "buyer", "userid": "0", "password": "petey4life"}'
 ##
 
 @app.route('/users/', methods=['POST'])
 def add_users():
-    logger.info('POST /users')
+    logger.info('POST /user')
     payload = flask.request.get_json()
 
     conn = db_connection()
     cur = conn.cursor()
 
-    logger.debug(f'POST /users - payload: {payload}')
+    logger.debug(f'POST /user - payload: {payload}')
 
     # do not forget to validate every argument, e.g.,:
     if 'userid' not in payload:
@@ -198,19 +193,14 @@ def add_users():
     return flask.jsonify(response)
 
 
-## AUCTION
-## Demo GET
+## Retrieve details of an auction
 ##
-## Obtain specific auctions in JSON format
-##
-## To use it, access:
-##
-## http://localhost:8080/auction/1
+## http://localhost:8080/auction/{auctionid}
 ##
 
 @app.route('/auction/auctionid/', methods=['GET'])
 def get_all_auctions():
-    logger.info('GET /auction/auctionid')
+    logger.info('GET /auction/{auctionid}')
 
     conn = db_connection()
     cur = conn.cursor()
@@ -239,7 +229,46 @@ def get_all_auctions():
     return flask.jsonify(response)
 
 
+## Create a new auction
+## POST http://localhost:8080/auction/
+## req: itemId, minimumPrice, title, description ...
+## res: auctionId
 
+## List all existing auctions
+## GET http://localhost:8080/auctions
+## req: none
+## res: list of auctions
+
+## Search existing auctions
+## GET http://localhost:8080/auctions/{keyword}
+## req: none
+## res: list of auctions
+
+## List all auctions in which the user has activity
+## GET http://localhost:8080/auctions/user/{userId}
+## req: none
+## res: list of auctions
+
+## Place a bid in an auction
+## POST http://localhost:8080/auction/{auctionId}/{bid}
+## req: none
+## res: success or error code
+
+## Edit properties of an auction
+## PUT http://localhost:8080/auction/{auctionId}
+## req: information to be modified
+## res: updated auction information
+
+## Write a message on the auction's board
+## POST
+
+## Immediate Delivery of messages to users
+
+## Outbid notification
+
+## Close auction
+
+## Cancel auction
 
 
 
