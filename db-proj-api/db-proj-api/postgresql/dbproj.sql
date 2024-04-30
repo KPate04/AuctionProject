@@ -1,4 +1,10 @@
 -- Replace this by the SQL code needed to create your database
+CREATE TABLE tokens (
+    userid bigint,
+    token_value TEXT NOT NULL,
+	deadline timestamp
+);
+
 CREATE TABLE items (
 	itemid		 BIGSERIAL,
 	name		 VARCHAR(512),
@@ -24,6 +30,7 @@ CREATE TABLE seller (
 CREATE TABLE auction (
 	auctionid		 BIGSERIAL,
 	auction_end	 TIMESTAMP,
+	auctiontitle VARCHAR(512),
 	sellerdesc		 VARCHAR(512),
 	items_itemid	 BIGINT NOT NULL,
 	seller_users_userid BIGINT NOT NULL,
@@ -82,3 +89,9 @@ ALTER TABLE bids_auction ADD CONSTRAINT bids_auction_fk1 FOREIGN KEY (bids_bidid
 ALTER TABLE bids_auction ADD CONSTRAINT bids_auction_fk2 FOREIGN KEY (auction_auctionid) REFERENCES auction(auctionid);
 ALTER TABLE buyer_items ADD CONSTRAINT buyer_items_fk1 FOREIGN KEY (buyer_users_userid) REFERENCES buyer(users_userid);
 ALTER TABLE buyer_items ADD CONSTRAINT buyer_items_fk2 FOREIGN KEY (items_itemid) REFERENCES items(itemid);
+
+INSERT into users (password, usertype) values ('test123', 'buyer');
+INSERT into buyer (users_userid) values (1);
+INSERT into users (password, usertype) values ('test321', 'seller');
+INSERT into seller (users_userid) values (2);
+INSERT into items (name, bid_amt, seller_users_userid) values ('bike', 5.00, 2);

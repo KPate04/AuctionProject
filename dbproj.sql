@@ -1,3 +1,9 @@
+CREATE TABLE tokens (
+    tokenid SERIAL PRIMARY KEY,
+    token_value TEXT NOT NULL,
+	PRIMARY KEY(userid)
+);
+
 CREATE TABLE items (
 	itemid		 BIGSERIAL,
 	name		 VARCHAR(512),
