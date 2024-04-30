@@ -199,7 +199,7 @@ def add_users():
 ##
 
 @app.route('/auction/<auctionid>/', methods=['GET'])
-def get_all_auctions():
+def get_auction():
     logger.info('GET /auction/{auctionid}')
 
     conn = db_connection()
