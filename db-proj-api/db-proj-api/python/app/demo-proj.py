@@ -198,7 +198,7 @@ def add_users():
 ## http://localhost:8080/auction/{auctionid}
 ##
 
-@app.route('/auction/auctionid/', methods=['GET'])
+@app.route('/auction/<auctionid>/', methods=['GET'])
 def get_all_auctions():
     logger.info('GET /auction/{auctionid}')
 
@@ -234,30 +234,255 @@ def get_all_auctions():
 ## req: itemId, minimumPrice, title, description ...
 ## res: auctionId
 
+@app.route('/auction/', methods=['POST'])
+def add_auction():
+    logger.info('POST /auction')
+    payload = flask.request.get_json()
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    logger.debug(f'POST /auction - payload: {payload}')
+
+    # do not forget to validate every argument, e.g.,:
+    if 'itemId' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'itemId value not in payload'}
+        return flask.jsonify(response)
+    if 'minimumPrice' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'minimumPrice value not in payload'}
+        return flask.jsonify(response)
+    if 'title' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'title value not in payload'}
+        return flask.jsonify(response)
+    if 'description' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'description value not in payload'}
+        return flask.jsonify(response)
+
+    # parameterized queries, good for security and performance
+    statement = 'INSERT INTO auction (itemId, minimumPrice, title, description) VALUES (%s, %s, %s, %s)'
+    values = (payload['itemId'], payload['minimumPrice'], payload['title'], payload['description'])
+
+    try:
+        cur.execute(statement, values)
+
+        # commit the transaction
+        conn.commit()
+        response = {'status': StatusCodes['success'], 'results': f'Inserted auction {payload["itemId"]}'}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'POST /auction - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+        # an error occurred, rollback
+        conn.rollback()
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
+
 ## List all existing auctions
 ## GET http://localhost:8080/auctions
 ## req: none
 ## res: list of auctions
 
+@app.route('/auctions/', methods=['GET'])
+def get_all_auctions():
+    logger.info('GET /auctions')
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute('SELECT auctionid, auction_end, sellerdesc FROM auction')
+        rows = cur.fetchall()
+
+        logger.debug('GET /auctions - parse')
+        Results = []
+        for row in rows:
+            logger.debug(row)
+            content = {'auctionid': row[0], 'auction_end': row[1], 'sellerdesc': row[2]}
+            Results.append(content)  # appending to the payload to be returned
+
+        response = {'status': StatusCodes['success'], 'results': Results}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'GET /auctions - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
+
 ## Search existing auctions
 ## GET http://localhost:8080/auctions/{keyword}
 ## req: none
 ## res: list of auctions
+@app.route('/auctions/<keyword>/', methods=['GET'])
+def get_auctions(keyword):
+    logger.info('GET /auctions/{keyword}')
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute('SELECT auctionid, auction_end, sellerdesc FROM auction where sellerdesc like %s', (keyword,))
+        rows = cur.fetchall()
+
+        logger.debug('GET /auctions/{keyword} - parse')
+        Results = []
+        for row in rows:
+            logger.debug(row)
+            content = {'auctionid': row[0], 'auction_end': row[1], 'sellerdesc': row[2]}
+            Results.append(content)  # appending to the payload to be returned
+
+        response = {'status': StatusCodes['success'], 'results': Results}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'GET /auctions/{keyword} - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
+
 
 ## List all auctions in which the user has activity
 ## GET http://localhost:8080/auctions/user/{userId}
 ## req: none
 ## res: list of auctions
+@app.route('/auctions/user/<userId>/', methods=['GET'])
+def get_auctions_user(userId):
+    logger.info('GET /auctions/user/{userId}')
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute('SELECT auctionid, auction_end, sellerdesc FROM auction where seller_users_userid = %s', (userId,))
+        rows = cur.fetchall()
+
+        logger.debug('GET /auctions/user/{userId} - parse')
+        Results = []
+        for row in rows:
+            logger.debug(row)
+            content = {'auctionid': row[0], 'auction_end': row[1], 'sellerdesc': row[2]}
+            Results.append(content)  # appending to the payload to be returned
+
+        response = {'status': StatusCodes['success'], 'results': Results}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'GET /auctions/user/{userId} - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
+
 
 ## Place a bid in an auction
 ## POST http://localhost:8080/auction/{auctionId}/{bid}
 ## req: none
 ## res: success or error code
+@app.route('/auction/<auctionId>/<bid>/', methods=['POST'])
+def place_bid(auctionId, bid):
+    logger.info('POST /auction/{auctionId}/{bid}')
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute('SELECT * FROM auction where auctionid = %s', (auctionId,))
+        rows = cur.fetchall()
+
+        if len(rows) == 0:
+            response = {'status': StatusCodes['api_error'], 'results': 'auction does not exist'}
+            return flask.jsonify(response)
+
+        cur.execute('SELECT * FROM bids where auction_auctionid = %s', (auctionId,))
+        rows = cur.fetchall()
+
+        if len(rows) == 0:
+            response = {'status': StatusCodes['api_error'], 'results': 'auction does not have any bids'}
+            return flask.jsonify(response)
+
+        cur.execute('SELECT * FROM bids where bid_amt < %s and auction_auctionid = %s', (bid, auctionId))
+        rows = cur.fetchall()
+
+        if len(rows) == 0:
+            response = {'status': StatusCodes['api_error'], 'results': 'bid is not higher than the current highest bid'}
+            return flask.jsonify(response)
+
+        statement = 'INSERT INTO bids (bid_amt, auction_auctionid) VALUES (%s, %s)'
+        values = (bid, auctionId)
+
+        cur.execute(statement, values)
+
+        conn.commit()
+        response = {'status': StatusCodes['success'], 'results': 'bid placed'}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'POST /auction/{auctionId}/{bid} - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+        conn.rollback()
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
 
 ## Edit properties of an auction
 ## PUT http://localhost:8080/auction/{auctionId}
 ## req: information to be modified
 ## res: updated auction information
+@app.route('/auction/<auctionId>/', methods=['PUT'])
+def edit_auction(auctionId):
+    logger.info('PUT /auction/{auctionId}')
+    payload = flask.request.get_json()
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    logger.debug(f'PUT /auction/{auctionId} - payload: {payload}')
+
+    # do not forget to validate every argument, e.g.,:
+    if 'auction_end' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'auction_end value not in payload'}
+        return flask.jsonify(response)
+    if 'sellerdesc' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'sellerdesc value not in payload'}
+        return flask.jsonify(response)
+
+    # parameterized queries, good for security and performance
+    statement = 'UPDATE auction SET auction_end = %s, sellerdesc = %s WHERE auctionid = %s'
+    values = (payload['auction_end'], payload['sellerdesc'], auctionId)
+
+    try:
+        cur.execute(statement, values)
+
+        conn.commit()
+        response = {'status': StatusCodes['success'], 'results': f'Updated auction {auctionId}'}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'PUT /auction/{auctionId} - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+        conn.rollback()
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
 
 ## Write a message on the auction's board
 ## POST
