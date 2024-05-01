@@ -6,47 +6,35 @@ CREATE TABLE tokens (
 );
 
 CREATE TABLE items (
-	itemid		 BIGSERIAL,
-	name		 VARCHAR(512),
-	bid_amt		 DOUBLE PRECISION,
-	seller_users_userid BIGINT NOT NULL,
+	itemid	 BIGSERIAL,
+	name	 VARCHAR(512),
+	min_price	 DOUBLE PRECISION,
+	users_userid BIGINT NOT NULL,
 	PRIMARY KEY(itemid)
 );
 
-CREATE TABLE buyer (
-	bid_amt	 DOUBLE PRECISION,
-	bids_bidid	 BIGINT NOT NULL,
-	users_userid BIGINT,
-	PRIMARY KEY(users_userid)
-);
-
-CREATE TABLE seller (
-	min_price	 DOUBLE PRECISION,
-	auction_end	 TIMESTAMP,
-	users_userid BIGINT,
-	PRIMARY KEY(users_userid)
-);
-
 CREATE TABLE auction (
-	auctionid		 BIGSERIAL,
-	auction_end	 TIMESTAMP,
+	auctionid	 BIGSERIAL,
 	auctiontitle VARCHAR(512),
-	sellerdesc		 VARCHAR(512),
-	items_itemid	 BIGINT NOT NULL,
-	seller_users_userid BIGINT NOT NULL,
+	auction_end	 TIMESTAMP,
+	sellerdesc	 VARCHAR(512),
+	users_userid BIGINT NOT NULL,
+	items_itemid BIGINT NOT NULL,
 	PRIMARY KEY(auctionid)
 );
 
 CREATE TABLE bids (
-	bidid	 BIGSERIAL,
-	bid_amt DOUBLE PRECISION,
-	PRIMARY KEY(bidid)
+	bidid		 BIGSERIAL,
+	bid_amt		 DOUBLE PRECISION,
+	users_userid	 BIGINT,
+	auction_auctionid BIGINT,
+	PRIMARY KEY(bidid,users_userid,auction_auctionid)
 );
 
 CREATE TABLE users (
 	userid	 BIGSERIAL,
 	password VARCHAR(512),
-	usertype CHAR(255),
+	usertype VARCHAR(10) NOT NULL,
 	PRIMARY KEY(userid)
 );
 
@@ -61,37 +49,31 @@ CREATE TABLE inbox (
 CREATE TABLE posts (
 	postid		 BIGSERIAL,
 	post		 VARCHAR(512),
+	users_userid	 BIGINT NOT NULL,
 	auction_auctionid BIGINT NOT NULL,
 	PRIMARY KEY(postid)
 );
 
-CREATE TABLE bids_auction (
-	bids_bidid	 BIGINT,
-	auction_auctionid BIGINT,
-	PRIMARY KEY(bids_bidid,auction_auctionid)
+CREATE TABLE items_users (
+	items_itemid BIGINT,
+	users_userid BIGINT NOT NULL,
+	PRIMARY KEY(items_itemid)
 );
 
-CREATE TABLE buyer_items (
-	buyer_users_userid BIGINT,
-	items_itemid	 BIGINT,
-	PRIMARY KEY(buyer_users_userid,items_itemid)
-);
-
-ALTER TABLE items ADD CONSTRAINT items_fk1 FOREIGN KEY (seller_users_userid) REFERENCES seller(users_userid);
-ALTER TABLE buyer ADD CONSTRAINT buyer_fk1 FOREIGN KEY (bids_bidid) REFERENCES bids(bidid);
-ALTER TABLE buyer ADD CONSTRAINT buyer_fk2 FOREIGN KEY (users_userid) REFERENCES users(userid);
-ALTER TABLE seller ADD CONSTRAINT seller_fk1 FOREIGN KEY (users_userid) REFERENCES users(userid);
-ALTER TABLE auction ADD CONSTRAINT auction_fk1 FOREIGN KEY (items_itemid) REFERENCES items(itemid);
-ALTER TABLE auction ADD CONSTRAINT auction_fk2 FOREIGN KEY (seller_users_userid) REFERENCES seller(users_userid);
+ALTER TABLE items ADD CONSTRAINT items_fk1 FOREIGN KEY (users_userid) REFERENCES users(userid);
+ALTER TABLE auction ADD CONSTRAINT auction_fk1 FOREIGN KEY (users_userid) REFERENCES users(userid);
+ALTER TABLE auction ADD CONSTRAINT auction_fk2 FOREIGN KEY (items_itemid) REFERENCES items(itemid);
+ALTER TABLE bids ADD CONSTRAINT bids_fk1 FOREIGN KEY (users_userid) REFERENCES users(userid);
+ALTER TABLE bids ADD CONSTRAINT bids_fk2 FOREIGN KEY (auction_auctionid) REFERENCES auction(auctionid);
 ALTER TABLE inbox ADD CONSTRAINT inbox_fk1 FOREIGN KEY (users_userid) REFERENCES users(userid);
-ALTER TABLE posts ADD CONSTRAINT posts_fk1 FOREIGN KEY (auction_auctionid) REFERENCES auction(auctionid);
-ALTER TABLE bids_auction ADD CONSTRAINT bids_auction_fk1 FOREIGN KEY (bids_bidid) REFERENCES bids(bidid);
-ALTER TABLE bids_auction ADD CONSTRAINT bids_auction_fk2 FOREIGN KEY (auction_auctionid) REFERENCES auction(auctionid);
-ALTER TABLE buyer_items ADD CONSTRAINT buyer_items_fk1 FOREIGN KEY (buyer_users_userid) REFERENCES buyer(users_userid);
-ALTER TABLE buyer_items ADD CONSTRAINT buyer_items_fk2 FOREIGN KEY (items_itemid) REFERENCES items(itemid);
+ALTER TABLE posts ADD CONSTRAINT posts_fk1 FOREIGN KEY (users_userid) REFERENCES users(userid);
+ALTER TABLE posts ADD CONSTRAINT posts_fk2 FOREIGN KEY (auction_auctionid) REFERENCES auction(auctionid);
+ALTER TABLE items_users ADD CONSTRAINT items_users_fk1 FOREIGN KEY (items_itemid) REFERENCES items(itemid);
+ALTER TABLE items_users ADD CONSTRAINT items_users_fk2 FOREIGN KEY (users_userid) REFERENCES users(userid);
+
 
 INSERT into users (password, usertype) values ('test123', 'buyer');
-INSERT into buyer (users_userid) values (1);
 INSERT into users (password, usertype) values ('test321', 'seller');
-INSERT into seller (users_userid) values (2);
-INSERT into items (name, bid_amt, seller_users_userid) values ('bike', 5.00, 2);
+INSERT into items (name, min_price, users_userid) values ('bike', 5.00, 2);
+INSERT into auction (auctiontitle,auction_end,sellerdesc,users_userid,	items_itemid) values ('Auction Title','2024-05-02 20:00:00', 'Seller Description', 2, 1);
+INSERT into bids (bid_amt, users_userid, auction_auctionid) values (10.00, 2, 1);
