@@ -450,7 +450,7 @@ def place_bid(auctionId, bid, userId):
 ## req: information to be modified
 ## res: updated auction information
 @app.route('/auction/<auctionId>/<userId>', methods=['PUT'])
-def edit_auction(auctionId):
+def edit_auction(auctionId, userId):
     logger.info('PUT /auction/{auctionId}/{userId}')
     payload = flask.request.get_json()
 
@@ -476,9 +476,16 @@ def edit_auction(auctionId):
         response = {'status': StatusCodes['api_error'], 'results': 'items_itemid value not in payload'}
         return flask.jsonify(response)
 
+    cur.execute('SELECT usertype FROM users WHERE userid = %s', (payload['users_userid'],))
+    user_type = cur.fetchone()[0]
+
+    if user_type != 'seller':
+        response = {'status': StatusCodes['api_error'], 'results': 'Only sellers can update auctions'}
+        return flask.jsonify(response)
+
     # parameterized queries, good for security and performance
-    statement = 'UPDATE auction SET auction_end = %s, sellerdesc = %s WHERE auctionid = %s'
-    values = (payload['auction_end'], payload['sellerdesc'], auctionId)
+    statement = 'UPDATE auction SET auctiontitle = %s, auction_end = %s, sellerdesc = %s, users_userid = %s, items_itemid = %s WHERE auctionid = %s'
+    values = (payload['auctiontitle'], payload['auction_end'], payload['sellerdesc'], payload['users_userid'], payload['items_itemid'], auctionId)
 
     try:
         cur.execute(statement, values)
@@ -499,7 +506,41 @@ def edit_auction(auctionId):
     return flask.jsonify(response)
 
 ## Write a message on the auction's board
-## POST
+@app.route('/auction/<auctionId>/posts', methods=['POST'])
+def write_message(auctionId):
+    payload = flask.request.get_json()
+
+    # Save the message to the auction's board in the database
+    conn = db_connection()
+    cur = conn.cursor()
+
+    if 'post' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'post value not in payload'}
+        return flask.jsonify(response)
+    if 'users_userid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'users_userid value not in payload'}
+        return flask.jsonify(response) 
+    if 'auction_auctionid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'auction_auctionid value not in payload'}
+        return flask.jsonify(response)
+
+    try:
+        statement = 'INSERT INTO posts (post, users_userid, auction_auctionid) VALUES (%s, %s, %s)'
+        values = (payload['post'], payload['users_userid'], auctionId)
+        cur.execute(statement, values)
+        conn.commit()
+
+        response = {'status': StatusCodes['success'], 'results': 'Message posted successfully'}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+        conn.rollback()
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
 
 ## Immediate Delivery of messages to users
 
