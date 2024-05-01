@@ -499,11 +499,10 @@ def edit_auction(auctionId):
     return flask.jsonify(response)
 
 ## Write a message on the auction's board
-## POST http://localhost:8080/inbox/{recieverid}/{message}
-## req: 
-## res: 
+## POST http://localhost:8080/inbox/{message}
+##
 
-@app.route('/inbox/<recieverid>/<message>', methods=['POST'])
+@app.route('/inbox/<message>', methods=['POST'])
 def add_inbox(message):
     logger.info('POST /inbox/{message}')
     payload = flask.request.get_json()
@@ -513,6 +512,7 @@ def add_inbox(message):
 
     logger.debug(f'POST /inbox/{message} - payload: {payload}')
 
+    # do not forget to validate every argument, e.g.,:
     if 'messageid' not in payload:
         response = {'status': StatusCodes['api_error'], 'results': 'messageid value not in payload'}
         return flask.jsonify(response)
