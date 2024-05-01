@@ -499,7 +499,58 @@ def edit_auction(auctionId):
     return flask.jsonify(response)
 
 ## Write a message on the auction's board
-## POST
+## POST http://localhost:8080/inbox/{message}
+##
+
+@app.route('/inbox/<message>', methods=['POST'])
+def add_inbox(message):
+    logger.info('POST /inbox/{message}')
+    payload = flask.request.get_json()
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    logger.debug(f'POST /inbox/{message} - payload: {payload}')
+
+    # do not forget to validate every argument, e.g.,:
+    if 'messageid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'messageid value not in payload'}
+        return flask.jsonify(response)
+    if 'recieverid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'recieverid value not in payload'}
+        return flask.jsonify(response)
+    if 'message' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'message value not in payload'}
+        return flask.jsonify(response)
+    if 'users_userid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'users_userid value not in payload'}
+        return flask.jsonify(response)
+    
+
+    # parameterized queries, good for security and performance
+    statement = 'INSERT INTO inbox (messageid, recieverid, message, users_userid) VALUES (%s, %s, %s, %s)'
+    values = (payload['messageid'], payload['recieverid'], payload['message'], payload['users_userid'])
+
+    try:
+        cur.execute(statement, values)
+
+        # commit the transaction
+        conn.commit()
+        response = {'status': StatusCodes['success'], 'results': f'Inserted post {payload["messageid"]}'}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'POST /inbox/{message} - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+        # an error occurred, rollback
+        conn.rollback()
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
+
 
 ## Immediate Delivery of messages to users
 
@@ -553,8 +604,6 @@ def edit_auction(auctionId):
 
 
 ## FUNCTIONS THAT ARE NOT NEEDED IN THE FINAL PROJECT
-
-
 
 ## USERS
 ## Demo GET
