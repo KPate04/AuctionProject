@@ -543,6 +543,49 @@ def write_message(auctionId):
     return flask.jsonify(response)
 
 ## Immediate Delivery of messages to users
+@app.route('/inbox/<userId>', methods=['GET'])
+@token_required
+def get_messages(current_user, userId):
+    conn = db_connection()
+    cur = conn.cursor()
+
+    logger.info('GET /inbox/{userId}')
+
+    try:
+        cur.execute('SELECT * FROM posts WHERE users_userid = %s', (userId,))
+        rows = cur.fetchall()
+
+        logger.debug('GET /inbox/{userId} - parse')
+        Results = []
+        for row in rows:
+            logger.debug(row)
+            content = {'postid': row[0], 'post': row[1], 'auction_auctionid': row[3]}
+            Results.append(content)  # appending to the payload to be returned
+
+        response = {'status': StatusCodes['success'], 'results': Results}
+
+        ## if the usertype based on the userid is seller, show all posts related to the auctions of the seller
+        cur.execute('SELECT usertype FROM users WHERE userid = %s', (userId,))
+        user_type = cur.fetchone()[0]
+        if user_type == 'seller':
+            cur.execute('SELECT auctionid FROM auction WHERE users_userid = %s', (userId,))
+            auctions = cur.fetchall()
+            for auction in auctions:
+                cur.execute('SELECT * FROM posts WHERE auction_auctionid = %s', (auction[0],))
+                rows = cur.fetchall()
+                for row in rows:
+                    content = {'postid': row[0], 'post': row[1], 'users_userid': row[2], 'auction_auctionid': row[3]}
+                    Results.append(content)
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+        conn.rollback()
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
 
 ## Outbid notification
 
