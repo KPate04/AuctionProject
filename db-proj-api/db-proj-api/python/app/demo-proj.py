@@ -396,9 +396,9 @@ def get_auctions_user(current_user, userId):
 ## POST http://localhost:8080/auction/{auctionId}/{bid}
 ## req: none
 ## res: success or error code
-@app.route('/auction/<auctionId>/<bid>/', methods=['POST'])
-def place_bid(auctionId, bid):
-    logger.info('POST /auction/{auctionId}/{bid}')
+@app.route('/auction/<auctionId>/<bid>/<userId>/', methods=['POST'])
+def place_bid(auctionId, bid, userId):
+    logger.info('POST /auction/{auctionId}/{bid}/{userId}')
 
     conn = db_connection()
     cur = conn.cursor()
@@ -425,8 +425,8 @@ def place_bid(auctionId, bid):
             response = {'status': StatusCodes['api_error'], 'results': 'bid is not higher than the current highest bid'}
             return flask.jsonify(response)
 
-        statement = 'INSERT INTO bids (bid_amt, auction_auctionid) VALUES (%s, %s)'
-        values = (bid, auctionId)
+        statement = 'INSERT INTO bids (auction_auctionid, bid_amt, users_userid) VALUES (%s, %s, %s)'
+        values = (auctionId, float(bid), userId)
 
         cur.execute(statement, values)
 
