@@ -404,44 +404,34 @@ def place_bid(auctionId, bid, userId):
     cur = conn.cursor()
 
     try:
-        # Check if auction exists
-        cur.execute('SELECT * FROM auction WHERE auctionid = %s', (auctionId,))
-        auction = cur.fetchone()
+        cur.execute('SELECT * FROM auction where auctionid = %s', (auctionId,))
+        rows = cur.fetchall()
 
-        if auction is None:
-            response = {'status': StatusCodes['api_error'], 'results': 'Auction does not exist'}
+        if len(rows) == 0:
+            response = {'status': StatusCodes['api_error'], 'results': 'auction does not exist'}
             return flask.jsonify(response)
 
-        # Check if auction has ended
-        current_time = time.strftime('%Y-%m-%d %H:%M:%S')
-        if current_time > auction[2]:
-            response = {'status': StatusCodes['api_error'], 'results': 'Auction has ended'}
+        cur.execute('SELECT * FROM bids where auction_auctionid = %s', (auctionId,))
+        rows = cur.fetchall()
+
+        if len(rows) == 0:
+            response = {'status': StatusCodes['api_error'], 'results': 'auction does not have any bids'}
             return flask.jsonify(response)
 
-        # Check if buyer has already placed a higher bid
-        cur.execute('SELECT * FROM bids WHERE auction_auctionid = %s AND users_userid = %s', (auctionId, userId))
-        previous_bid = cur.fetchone()
+        cur.execute('SELECT * FROM bids where bid_amt < %s and auction_auctionid = %s', (bid, auctionId))
+        rows = cur.fetchall()
 
-        if previous_bid is not None and float(bid) <= previous_bid[1]:
-            response = {'status': StatusCodes['api_error'], 'results': 'You have already placed a higher bid'}
+        if len(rows) == 0:
+            response = {'status': StatusCodes['api_error'], 'results': 'bid is not higher than the current highest bid'}
             return flask.jsonify(response)
 
-        # Check if bid is higher than minimum price
-        cur.execute('SELECT min_price FROM items WHERE itemId = %s = auction.items_itemid', (auctionId,))
-        min_price = cur.fetchone()[0]
-
-        if float(bid) < min_price:
-            response = {'status': StatusCodes['api_error'], 'results': 'Bid is lower than the minimum price'}
-            return flask.jsonify(response)
-
-        # Insert bid into database
         statement = 'INSERT INTO bids (auction_auctionid, bid_amt, users_userid) VALUES (%s, %s, %s)'
         values = (auctionId, float(bid), userId)
 
         cur.execute(statement, values)
-        conn.commit()
 
-        response = {'status': StatusCodes['success'], 'results': 'Bid placed'}
+        conn.commit()
+        response = {'status': StatusCodes['success'], 'results': 'bid placed'}
 
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(f'POST /auction/{auctionId}/{bid} - error: {error}')
@@ -459,9 +449,9 @@ def place_bid(auctionId, bid, userId):
 ## PUT http://localhost:8080/auction/{auctionId}
 ## req: information to be modified
 ## res: updated auction information
-@app.route('/auction/<auctionId>/', methods=['PUT'])
+@app.route('/auction/<auctionId>/<userId>', methods=['PUT'])
 def edit_auction(auctionId):
-    logger.info('PUT /auction/{auctionId}')
+    logger.info('PUT /auction/{auctionId}/{userId}')
     payload = flask.request.get_json()
 
     conn = db_connection()
@@ -478,6 +468,12 @@ def edit_auction(auctionId):
         return flask.jsonify(response)
     if 'sellerdesc' not in payload:
         response = {'status': StatusCodes['api_error'], 'results': 'sellerdesc value not in payload'}
+        return flask.jsonify(response)
+    if 'users_userid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'users_userid value not in payload'}
+        return flask.jsonify(response)
+    if 'items_itemid' not in payload:
+        response = {'status': StatusCodes['api_error'], 'results': 'items_itemid value not in payload'}
         return flask.jsonify(response)
 
     # parameterized queries, good for security and performance
