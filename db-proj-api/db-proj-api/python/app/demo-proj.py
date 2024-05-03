@@ -341,7 +341,13 @@ def get_auction(current_user,auctionid):
         Results = []
         for row in rows:
             logger.debug(row)
-            content = {'auctionid': row[0], 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3], 'auction_winner': row[4]}
+            auction_posts = []
+            cur.execute('SELECT * FROM posts WHERE auction_auctionid = %s', (auction[0],))
+                rows = cur.fetchall()
+                for row in rows:
+                    content = {'postid': row[0], 'post': row[1]}
+                    auction_posts.append(content)
+            content = {'auctionid': row[0], 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3], 'auction_winner': row[4], 'posts': auction_posts}
             Results.append(content)  # appending to the payload to be returned
 
         response = {'status': StatusCodes['success'], 'results': Results}
