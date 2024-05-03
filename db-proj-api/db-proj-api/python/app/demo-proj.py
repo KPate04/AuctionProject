@@ -9,7 +9,6 @@ import flask
 import logging, psycopg2, time
 from functools import wraps
 import random
-from datetime import datetime
 
 app = flask.Flask(__name__)
 
@@ -226,8 +225,8 @@ def add_auction():
         response = {'status': StatusCodes['api_error'], 'results': 'items_itemid value not in payload'}
         return flask.jsonify(response)
     # parameterized queries, good for security and performance
-    statement = 'INSERT INTO auction (auctiontitle, auction_end, sellerdesc, users_userid, items_itemid) VALUES (%s, %s, %s, %s, %s)'
-    values = (payload['auctiontitle'], payload['auction_end'], payload['sellerdesc'], payload['users_userid'], payload['items_itemid'])
+    statement = 'INSERT INTO auction (auctiontitle, auction_end, sellerdesc, users_userid, items_itemid, auction_winner) VALUES (%s, %s, %s, %s, %s, NULL)'
+    values = (payload['auctiontitle'], payload['auction_end'], payload['sellerdesc'], payload['users_userid'], payload['items_itemid'], payload['auction_winner'])
 
     try:
         cur.execute(statement, values)
@@ -263,14 +262,14 @@ def get_all_auctions(current_user):
     cur = conn.cursor()
 
     try:
-        cur.execute('SELECT auctionid, auctiontitle, auction_end, sellerdesc, users_userid, items_itemid FROM auction')
+        cur.execute('SELECT auctionid, auctiontitle, auction_end, sellerdesc, users_userid, items_itemid, auction_winner FROM auction')
         rows = cur.fetchall()
 
         logger.debug('GET /auctions - parse')
         Results = []
         for row in rows:
             logger.debug(row)
-            content = {'auctionid': row[0], 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3],'users_userid': row[4],'items_itemid': row[5]}
+            content = {'auctionid': row[0], 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3],'users_userid': row[4],'items_itemid': row[5], 'auction_winner': row[6]}
             Results.append(content)  # appending to the payload to be returned
 
         response = {'status': StatusCodes['success'], 'results': Results}
@@ -298,14 +297,14 @@ def get_auctions(current_user, keyword):
     cur = conn.cursor()
 
     try:
-        cur.execute("SELECT auctionid, auctiontitle, auction_end, sellerdesc, users_userid, items_itemid FROM auction where sellerdesc like '%"+keyword+"%' or auctiontitle like '%"+keyword+"%'") #+?+'%'", ('keyword',))
+        cur.execute("SELECT auctionid, auctiontitle, auction_end, sellerdesc, users_userid, items_itemid, auction_winner FROM auction where sellerdesc like '%"+keyword+"%' or auctiontitle like '%"+keyword+"%'") #+?+'%'", ('keyword',))
         rows = cur.fetchall()
 
         logger.debug('GET /auctions/{keyword} - parse')
         Results = []
         for row in rows:
             logger.debug(row)
-            content = {'auctionid': row[0]} #, 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3],'users_userid': row[4],'items_itemid': row[5]}
+            content = {'auctionid': row[0], 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3],'users_userid': row[4],'items_itemid': row[5], 'auction_winner': row[6]}
             Results.append(content)  # appending to the payload to be returned
 
         response = {'status': StatusCodes['success'], 'results': Results}
@@ -334,14 +333,14 @@ def get_auction(current_user,auctionid):
     cur = conn.cursor()
 
     try:
-        cur.execute('SELECT auctionid, auctiontitle, auction_end, sellerdesc FROM auction where auctionid='+str(auctionid))
+        cur.execute('SELECT auctionid, auctiontitle, auction_end, sellerdesc, auction_winner FROM auction where auctionid='+str(auctionid))
         rows = cur.fetchall()
 
         logger.debug('GET /auction/auctionid - parse')
         Results = []
         for row in rows:
             logger.debug(row)
-            content = {'auctionid': row[0], 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3]}
+            content = {'auctionid': row[0], 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3], 'auction_winner': row[4]}
             Results.append(content)  # appending to the payload to be returned
 
         response = {'status': StatusCodes['success'], 'results': Results}
@@ -370,14 +369,14 @@ def get_auctions_user(current_user, userId):
     cur = conn.cursor()
 
     try:
-        cur.execute('SELECT a.auctionid, a.auctiontitle, a.auction_end, a.sellerdesc, a.users_userid, a.items_itemid, b.users_userid FROM auction as a, bids as b where a.auctionid = b.auction_auctionid and b.users_userid = %s', (userId,))
+        cur.execute('SELECT a.auctionid, a.auctiontitle, a.auction_end, a.sellerdesc, a.users_userid, a.items_itemid, a.auction_winner, b.users_userid FROM auction as a, bids as b where a.auctionid = b.auction_auctionid and b.users_userid = %s', (userId,))
         rows = cur.fetchall()
 
         logger.debug('GET /auctions/user/{userId} - parse')
         Results = []
         for row in rows:
             logger.debug(row)
-            content = {'auctionid': row[0], 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3]}
+            content = {'auctionid': row[0], 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3], 'auction_winner': row[6]}
             Results.append(content)  # appending to the payload to be returned
 
         response = {'status': StatusCodes['success'], 'results': Results}
@@ -410,6 +409,9 @@ def place_bid(auctionId, bid, userId):
 
         if len(rows) == 0:
             response = {'status': StatusCodes['api_error'], 'results': 'auction does not exist'}
+            return flask.jsonify(response)
+        if rows[0][6] is not None:
+            response = {'status': StatusCodes['api_error'], 'results': 'auction winner already declared'}
             return flask.jsonify(response)
 
         cur.execute('SELECT * FROM bids where auction_auctionid = %s', (auctionId,))
@@ -447,12 +449,12 @@ def place_bid(auctionId, bid, userId):
     return flask.jsonify(response)
 
 ## Edit properties of an auction
-## PUT http://localhost:8080/auction/{auctionId}/{changedinformation}
+## PUT http://localhost:8080/auction/{auctionId}
 ## req: information to be modified
 ## res: updated auction information
-@app.route('/auction/<auctionId>/', methods=['PUT'])
-def edit_auction(auctionId, userId):
-    logger.info('PUT /auction/{auctionId}')
+@app.route('/auction/<auctionId>/<userId>', methods=['PUT'])
+def edit_auction(auctionId):
+    logger.info('PUT /auction/{auctionId}/{userId}')
     payload = flask.request.get_json()
 
     conn = db_connection()
@@ -476,7 +478,7 @@ def edit_auction(auctionId, userId):
     if 'items_itemid' not in payload:
         response = {'status': StatusCodes['api_error'], 'results': 'items_itemid value not in payload'}
         return flask.jsonify(response)
-
+    
     cur.execute('SELECT usertype FROM users WHERE userid = %s', (payload['users_userid'],))
     user_type = cur.fetchone()[0]
 
@@ -485,8 +487,8 @@ def edit_auction(auctionId, userId):
         return flask.jsonify(response)
 
     # parameterized queries, good for security and performance
-    statement = 'UPDATE auction SET auctiontitle = %s, auction_end = %s, sellerdesc = %s, users_userid = %s, items_itemid = %s WHERE auctionid = %s'
-    values = (payload['auctiontitle'], payload['auction_end'], payload['sellerdesc'], payload['users_userid'], payload['items_itemid'], auctionId)
+    statement = 'UPDATE auction SET auction_end = %s, sellerdesc = %s WHERE auctionid = %s'
+    values = (payload['auction_end'], payload['sellerdesc'], auctionId)
 
     try:
         cur.execute(statement, values)
@@ -508,6 +510,7 @@ def edit_auction(auctionId, userId):
 
 ## Write a message on the auction's board
 @app.route('/auction/<auctionId>/posts', methods=['POST'])
+@token_required
 def write_message(auctionId):
     payload = flask.request.get_json()
 
@@ -544,6 +547,8 @@ def write_message(auctionId):
     return flask.jsonify(response)
 
 ## Immediate Delivery of messages to users
+## GET http://localhost:8080/inbox/{userId}
+
 @app.route('/inbox/<userId>', methods=['GET'])
 @token_required
 def get_messages(current_user, userId):
@@ -575,7 +580,7 @@ def get_messages(current_user, userId):
                 cur.execute('SELECT * FROM posts WHERE auction_auctionid = %s', (auction[0],))
                 rows = cur.fetchall()
                 for row in rows:
-                    content = {'postid': row[0], 'post': row[1], 'users_userid': row[2], 'auction_auctionid': row[3]}
+                    content = {'postid': row[0], 'post': row[1], 'auction_auctionid': row[3]}
                     Results.append(content)
 
     except (Exception, psycopg2.DatabaseError) as error:
@@ -588,43 +593,52 @@ def get_messages(current_user, userId):
 
     return flask.jsonify(response)
 
+    
+    
+
 ## Outbid notification
 
 ## Close auction
-
-## Cancel auction
-@app.route('/auction/cancel/<auctionid>/', methods=['PUT'])
+## PUT http://localhost:8080/auction/{auctionId}/close
+## req: none
+## res: updated auction information
+@app.route('/auction/<auctionId>/close', methods=['PUT'])
 @token_required
-def cancel_auction(current_user, auctionid):
-    logger.info(f'PUT /auction/cancel/{auctionid}')
+def close_auction(current_user, auctionId):
+    logger.info('PUT /auction/<auctionId>/close')
 
     conn = db_connection()
     cur = conn.cursor()
 
     try:
-        # Check if the current user is an administrator
-        if current_user['usertype'] != 'seller':
-            return flask.jsonify({'status': StatusCodes['unauthorized'], 'message': 'Only administrators can cancel auctions.'}), 401
-        
-        # Update the auction to mark it as closed
-        cur.execute("UPDATE auction SET auction_end = %s WHERE auctionid = %s", (datetime.now(), auctionid))
-        
-        # Notify interested users
-        cur.execute("SELECT DISTINCT receiverid FROM inbox WHERE users_userid IN (SELECT DISTINCT users_userid FROM bids WHERE bids_bidid IN (SELECT bids_bidid FROM bids_auction WHERE auction_auctionid = %s))", (auctionid,))
-        interested_users = cur.fetchall()
-        
-        for user_id in interested_users:
-            message = f"The auction with ID {auctionid} has been canceled."
-            cur.execute("INSERT INTO inbox (receiverid, message, users_userid) VALUES (%s, %s, %s)", (user_id, message, current_user['userid']))
-        
+        # Get the current date and time
+        current_datetime = time.strftime('%Y-%m-%d %H:%M:%S')
+
+        # Get the highest bid in the auction
+        cur.execute('SELECT MAX(bid) FROM bids WHERE auctionid = %s', (auctionId,))
+        highest_bid = cur.fetchone()[0]
+
+        # Get the user who placed the highest bid
+        cur.execute('SELECT userid FROM bids WHERE auctionid = %s AND bid = %s', (auctionId, highest_bid))
+        winner = cur.fetchone()[0]
+
+        # Update the auction with the winner
+        cur.execute('UPDATE auction SET auction_winner = %s WHERE auctionid = %s', (winner, auctionId))
+
+        # Update the auction with the closing date and time
+        cur.execute('UPDATE auction SET auction_end = %s WHERE auctionid = %s', (current_datetime, auctionId))
+
         # Commit the transaction
         conn.commit()
-        
-        response = {'status': StatusCodes['success'], 'message': f'Auction with ID {auctionid} has been canceled successfully.'}
+
+        response = {'status': StatusCodes['success'], 'results': f'Auction {auctionId} closed successfully'}
 
     except (Exception, psycopg2.DatabaseError) as error:
-        logger.error(f'PUT /auction/cancel/{auctionid} - error: {error}')
+        logger.error(f'PUT /auction/<auctionId>/close - error: {error}')
         response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+        # An error occurred, rollback
+        conn.rollback()
 
     finally:
         if conn is not None:
@@ -632,8 +646,7 @@ def cancel_auction(current_user, auctionid):
 
     return flask.jsonify(response)
 
-
-
+## Cancel auction
 
 
 
