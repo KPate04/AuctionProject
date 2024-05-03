@@ -325,16 +325,16 @@ def get_auctions(current_user, keyword):
 ## http://localhost:8080/auction/{auctionid}
 ##
 
-@app.route('/auction/<auctionid>/', methods=['GET'])
+@app.route('/auction/<auctionId>/', methods=['GET'])
 @token_required
-def get_auction(current_user,auctionid):
-    logger.info('GET /auction/{auctionid}')
+def get_auction(current_user,auctionId):
+    logger.info('GET /auction/{auctionId}')
 
     conn = db_connection()
     cur = conn.cursor()
 
     try:
-        cur.execute('SELECT auctionid, auctiontitle, auction_end, sellerdesc, auction_winner FROM auction where auctionid='+str(auctionid))
+        cur.execute('SELECT auctionid, auctiontitle, auction_end, sellerdesc, auction_winner FROM auction where auctionid='+str(auctionId))
         rows = cur.fetchall()
 
         logger.debug('GET /auction/auctionid - parse')
@@ -342,11 +342,11 @@ def get_auction(current_user,auctionid):
         for row in rows:
             logger.debug(row)
             auction_posts = []
-            cur.execute('SELECT * FROM posts WHERE auction_auctionid = %s', (auction[0],))
-                rows = cur.fetchall()
-                for row in rows:
-                    content = {'postid': row[0], 'post': row[1]}
-                    auction_posts.append(content)
+            cur.execute('SELECT * FROM posts WHERE auction_auctionid = %s', (auctionId,))
+            prows = cur.fetchall()
+            for prow in prows:
+                content = {'postid': prow[0], 'post': prow[1]}
+                auction_posts.append(content)
             content = {'auctionid': row[0], 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3], 'auction_winner': row[4], 'posts': auction_posts}
             Results.append(content)  # appending to the payload to be returned
 
