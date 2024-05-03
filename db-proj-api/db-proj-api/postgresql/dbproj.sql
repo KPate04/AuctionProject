@@ -20,7 +20,17 @@ CREATE TABLE auction (
     sellerdesc     VARCHAR(512),
     users_userid BIGINT NOT NULL,
     items_itemid BIGINT NOT NULL,
+	auction_winner BIGINT,
     PRIMARY KEY(auctionid)
+);
+
+CREATE TABLE old_auction (
+	auctionid	 BIGINT,
+	auctiontitle	 VARCHAR(512),
+	auction_end	 TIMESTAMP,
+	sellerdesc	 VARCHAR(512),
+	auction_winner BIGINT,
+	PRIMARY KEY(auctionid)
 );
 
 CREATE TABLE bids (
