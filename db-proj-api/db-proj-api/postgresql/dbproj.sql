@@ -45,7 +45,7 @@ CREATE TABLE bids (
 
 CREATE TABLE users (
     userid     BIGSERIAL,
-    password VARCHAR(512),
+    password VARCHAR(512) NOT NULL,
     usertype VARCHAR(10) NOT NULL,
     PRIMARY KEY(userid)
 );
