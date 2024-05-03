@@ -9,6 +9,7 @@ import flask
 import logging, psycopg2, time
 from functools import wraps
 import random
+from datetime import datetime
 
 app = flask.Flask(__name__)
 
@@ -446,12 +447,12 @@ def place_bid(auctionId, bid, userId):
     return flask.jsonify(response)
 
 ## Edit properties of an auction
-## PUT http://localhost:8080/auction/{auctionId}
+## PUT http://localhost:8080/auction/{auctionId}/{changedinformation}
 ## req: information to be modified
 ## res: updated auction information
-@app.route('/auction/<auctionId>/<userId>', methods=['PUT'])
+@app.route('/auction/<auctionId>/', methods=['PUT'])
 def edit_auction(auctionId, userId):
-    logger.info('PUT /auction/{auctionId}/{userId}')
+    logger.info('PUT /auction/{auctionId}')
     payload = flask.request.get_json()
 
     conn = db_connection()
@@ -592,7 +593,44 @@ def get_messages(current_user, userId):
 ## Close auction
 
 ## Cancel auction
+@app.route('/auction/cancel/<auctionid>/', methods=['PUT'])
+@token_required
+def cancel_auction(current_user, auctionid):
+    logger.info(f'PUT /auction/cancel/{auctionid}')
 
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        # Check if the current user is an administrator
+        if current_user['usertype'] != 'seller':
+            return flask.jsonify({'status': StatusCodes['unauthorized'], 'message': 'Only administrators can cancel auctions.'}), 401
+        
+        # Update the auction to mark it as closed
+        cur.execute("UPDATE auction SET auction_end = %s WHERE auctionid = %s", (datetime.now(), auctionid))
+        
+        # Notify interested users
+        cur.execute("SELECT DISTINCT receiverid FROM inbox WHERE users_userid IN (SELECT DISTINCT users_userid FROM bids WHERE bids_bidid IN (SELECT bids_bidid FROM bids_auction WHERE auction_auctionid = %s))", (auctionid,))
+        interested_users = cur.fetchall()
+        
+        for user_id in interested_users:
+            message = f"The auction with ID {auctionid} has been canceled."
+            cur.execute("INSERT INTO inbox (receiverid, message, users_userid) VALUES (%s, %s, %s)", (user_id, message, current_user['userid']))
+        
+        # Commit the transaction
+        conn.commit()
+        
+        response = {'status': StatusCodes['success'], 'message': f'Auction with ID {auctionid} has been canceled successfully.'}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'PUT /auction/cancel/{auctionid} - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
 
 
 
