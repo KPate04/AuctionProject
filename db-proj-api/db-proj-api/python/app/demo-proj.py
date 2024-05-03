@@ -520,6 +520,9 @@ def edit_auction(auctionId, userId):
         return flask.jsonify(response)
 
     # parameterized queries, good for security and performance
+    statement = 'INSERT INTO old_auction (auctionid, auctiontitle, auction_end, sellerdesc, users_userid, items_itemid) WHERE auctionid = %s'
+    values = (auctionId,)
+
     statement = 'UPDATE auction SET auction_end = %s, sellerdesc = %s WHERE auctionid = %s'
     values = (payload['auction_end'], payload['sellerdesc'], auctionId)
 
