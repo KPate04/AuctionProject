@@ -462,6 +462,13 @@ def place_bid(auctionId, bid, userId):
         conn.commit()
         response = {'status': StatusCodes['success'], 'results': 'bid placed'}
 
+        #select all distinct users that are not the user placing the bid and send all of them a message that a higher bid has been placed for auctionId
+        cur.execute('SELECT DISTINCT users_userid FROM bids WHERE auction_auctionid = %s AND users_userid != %s', (auctionId, userId))
+        users = cur.fetchall()
+        for user in users:
+            cur.execute('INSERT INTO posts (users_userid, auction_auctionid, post) VALUES (%s, %s, %s)', (user[0], auctionId, f'A higher bid of {bid} has been placed on auction {auctionId}'))  # Concatenate string values properly
+            conn.commit()
+
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(f'POST /auction/{auctionId}/{bid} - error: {error}')
         response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
