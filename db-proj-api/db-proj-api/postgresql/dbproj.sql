@@ -1,4 +1,10 @@
 -- Replace this by the SQL code needed to create your database
+CREATE TABLE tokens (
+    userid bigint,
+    token_value TEXT NOT NULL,
+	deadline timestamp
+);
+
 CREATE TABLE items (
     itemid     BIGSERIAL,
     name     VARCHAR(512),
@@ -55,6 +61,7 @@ ALTER TABLE posts ADD CONSTRAINT posts_fk1 FOREIGN KEY (users_userid) REFERENCES
 ALTER TABLE posts ADD CONSTRAINT posts_fk2 FOREIGN KEY (auction_auctionid) REFERENCES auction(auctionid);
 ALTER TABLE items_users ADD CONSTRAINT items_users_fk1 FOREIGN KEY (items_itemid) REFERENCES items(itemid);
 ALTER TABLE items_users ADD CONSTRAINT items_users_fk2 FOREIGN KEY (users_userid) REFERENCES users(userid);
+
 
 INSERT into users (password, usertype) values ('buyer1', 'buyer');
 INSERT into users (password, usertype) values ('buyer2', 'buyer');
