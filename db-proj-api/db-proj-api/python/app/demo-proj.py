@@ -9,6 +9,7 @@ import flask
 import logging, psycopg2, time
 from functools import wraps
 import random
+from datetime import datetime
 
 app = flask.Flask(__name__)
 
@@ -413,10 +414,16 @@ def place_bid(auctionId, bid, userId):
         if rows[0][6] is not None:
             response = {'status': StatusCodes['api_error'], 'results': 'auction winner already declared'}
             return flask.jsonify(response)
-        current_time = time.strftime('%Y-%m-%d %H:%M:%S')
-        if current_time >= rows[0][4]:
+        cur.execute('SELECT auction_end FROM auction WHERE auctionid = %s', (auctionId,))
+        end_time = cur.fetchone()[0]
+
+        # Convert current_time to datetime object
+        current_time = datetime.strptime(time.strftime('%Y-%m-%d %H:%M:%S'), '%Y-%m-%d %H:%M:%S')
+
+        if current_time > end_time:
             response = {'status': StatusCodes['api_error'], 'results': 'auction has already ended'}
             return flask.jsonify(response)
+
 
         cur.execute('SELECT * FROM bids where auction_auctionid = %s', (auctionId,))
         rows = cur.fetchall()
@@ -437,7 +444,7 @@ def place_bid(auctionId, bid, userId):
 
         highest_bid = rows[0][0]
 
-        if bid <= highest_bid:
+        if float(bid) <= highest_bid:
             response = {'status': StatusCodes['api_error'], 'results': 'bid is not higher than the current highest bid'}
             return flask.jsonify(response)
 
@@ -466,7 +473,7 @@ def place_bid(auctionId, bid, userId):
 ## req: information to be modified
 ## res: updated auction information
 @app.route('/auction/<auctionId>/<userId>', methods=['PUT'])
-def edit_auction(auctionId):
+def edit_auction(auctionId, userId):
     logger.info('PUT /auction/{auctionId}/{userId}')
     payload = flask.request.get_json()
 
@@ -492,7 +499,7 @@ def edit_auction(auctionId):
         response = {'status': StatusCodes['api_error'], 'results': 'items_itemid value not in payload'}
         return flask.jsonify(response)
     
-    cur.execute('SELECT usertype FROM users WHERE userid = %s', (payload['users_userid'],))
+    cur.execute('SELECT usertype FROM users WHERE userid = %s', (userId))
     user_type = cur.fetchone()[0]
 
     if user_type != 'seller':
@@ -523,7 +530,6 @@ def edit_auction(auctionId):
 
 ## Write a message on the auction's board
 @app.route('/auction/<auctionId>/posts', methods=['POST'])
-@token_required
 def write_message(auctionId):
     payload = flask.request.get_json()
 
@@ -537,9 +543,6 @@ def write_message(auctionId):
     if 'users_userid' not in payload:
         response = {'status': StatusCodes['api_error'], 'results': 'users_userid value not in payload'}
         return flask.jsonify(response) 
-    if 'auction_auctionid' not in payload:
-        response = {'status': StatusCodes['api_error'], 'results': 'auction_auctionid value not in payload'}
-        return flask.jsonify(response)
 
     try:
         statement = 'INSERT INTO posts (post, users_userid, auction_auctionid) VALUES (%s, %s, %s)'
@@ -578,7 +581,7 @@ def get_messages(current_user, userId):
         Results = []
         for row in rows:
             logger.debug(row)
-            content = {'postid': row[0], 'post': row[1], 'auction_auctionid': row[3]}
+            content = {'post_type': 'Posted by Me', 'postid': row[0], 'post': row[1], 'auction_auctionid': row[3]}
             Results.append(content)  # appending to the payload to be returned
 
         response = {'status': StatusCodes['success'], 'results': Results}
@@ -586,6 +589,18 @@ def get_messages(current_user, userId):
         ## if the usertype based on the userid is seller, show all posts related to the auctions of the seller
         cur.execute('SELECT usertype FROM users WHERE userid = %s', (userId,))
         user_type = cur.fetchone()[0]
+
+        # if the user is a buyer, show all posts related to the auctions the buyer has placed a bid on
+        if user_type == 'buyer':
+            cur.execute('SELECT auction_auctionid FROM bids WHERE users_userid = %s', (userId,))
+            auctions = cur.fetchall()
+            for auction in auctions:
+                cur.execute('SELECT * FROM posts WHERE auction_auctionid = %s', (auction[0],))
+                rows = cur.fetchall()
+                for row in rows:
+                    content = {'post_type': 'Posts in Auctions I am Active in', 'postid': row[0], 'post': row[1], 'auction_auctionid': row[3]}
+                    Results.append(content)
+        
         if user_type == 'seller':
             cur.execute('SELECT auctionid FROM auction WHERE users_userid = %s', (userId,))
             auctions = cur.fetchall()
@@ -593,7 +608,7 @@ def get_messages(current_user, userId):
                 cur.execute('SELECT * FROM posts WHERE auction_auctionid = %s', (auction[0],))
                 rows = cur.fetchall()
                 for row in rows:
-                    content = {'postid': row[0], 'post': row[1], 'auction_auctionid': row[3]}
+                    content = {'post_type': 'Posts in Auctions I am Hosting', 'postid': row[0], 'post': row[1], 'auction_auctionid': row[3]}
                     Results.append(content)
 
     except (Exception, psycopg2.DatabaseError) as error:
@@ -613,15 +628,23 @@ def get_messages(current_user, userId):
 ## PUT http://localhost:8080/auction/{auctionId}/close
 ## req: none
 ## res: updated auction information
-@app.route('/auction/<auctionId>/close', methods=['PUT'])
+@app.route('/auction/<auctionId>/close/<userId>', methods=['PUT'])
 @token_required
-def close_auction(current_user, auctionId):
-    logger.info('PUT /auction/<auctionId>/close')
+def close_auction(current_user, auctionId, userId):
+    logger.info('PUT /auction/<auctionId>/close/<userId>')
 
     conn = db_connection()
     cur = conn.cursor()
 
     try:
+        # Check if the user type is seller
+        cur.execute('SELECT usertype FROM users WHERE userid = %s', (userId,))
+        user_type = cur.fetchone()[0]
+
+        if user_type != 'seller':
+            response = {'status': StatusCodes['api_error'], 'errors': 'Only sellers can close auctions'}
+            return flask.jsonify(response)
+
         # Get the current date and time
         current_datetime = time.strftime('%Y-%m-%d %H:%M:%S')
 
@@ -661,15 +684,23 @@ def close_auction(current_user, auctionId):
 ## PUT http://localhost:8080/auction/{auctionId}/cancel
 ## req: none
 ## res: updated auction information
-@app.route('/auction/<auctionId>/cancel', methods=['PUT'])
+@app.route('/auction/<auctionId>/cancel/<userId>', methods=['PUT'])
 @token_required
-def cancel_auction(current_user, auctionId):
-    logger.info('PUT /auction/<auctionId>/cancel')
+def cancel_auction(current_user, auctionId, userId):
+    logger.info('PUT /auction/<auctionId>/cancel/<userId>')
 
     conn = db_connection()
     cur = conn.cursor()
 
     try:
+        # Check if the user type is seller
+        cur.execute('SELECT usertype FROM users WHERE userid = %s', (userId,))
+        user_type = cur.fetchone()[0]
+
+        if user_type != 'seller':
+            response = {'status': StatusCodes['api_error'], 'errors': 'Only sellers can close auctions'}
+            return flask.jsonify(response)
+
         # Update the auction status to "cancelled"
         current_time = time.strftime('%Y-%m-%d %H:%M:%S')
         cur.execute('UPDATE auction SET auction_end = %s WHERE auctionid = %s', (current_time, auctionId))
@@ -680,12 +711,12 @@ def cancel_auction(current_user, auctionId):
         row = cur.fetchone()
 
         # Get the users who have placed a bid on this auction
-        cur.execute('SELECT DISTINCT users_userid FROM bid WHERE auction_auctionid = %s', (auctionId,))
+        cur.execute('SELECT DISTINCT users_userid FROM bids WHERE auction_auctionid = %s', (auctionId,))
         users = cur.fetchall()
 
         # Insert a post for each user telling them the auction has cancelled
         for user in users:
-            cur.execute('INSERT INTO post (user_id, auction_id, message) VALUES (%s, %s, %s)', (user[0], auctionId, 'The auction has been cancelled.'))
+            cur.execute('INSERT INTO posts (users_userid, auction_auctionid, post) VALUES (%s, %s, %s)', (user[0], auctionId, 'The auction has been cancelled.'))
             conn.commit()
 
         response = {'status': StatusCodes['success'], 'results': 'Auction cancelled successfully.'}
