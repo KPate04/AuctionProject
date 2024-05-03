@@ -413,6 +413,10 @@ def place_bid(auctionId, bid, userId):
         if rows[0][6] is not None:
             response = {'status': StatusCodes['api_error'], 'results': 'auction winner already declared'}
             return flask.jsonify(response)
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S')
+        if current_time >= rows[0][4]:
+            response = {'status': StatusCodes['api_error'], 'results': 'auction has already ended'}
+            return flask.jsonify(response)
 
         cur.execute('SELECT * FROM bids where auction_auctionid = %s', (auctionId,))
         rows = cur.fetchall()
@@ -425,6 +429,15 @@ def place_bid(auctionId, bid, userId):
         rows = cur.fetchall()
 
         if len(rows) == 0:
+            response = {'status': StatusCodes['api_error'], 'results': 'bid is not higher than the current highest bid'}
+            return flask.jsonify(response)
+
+        cur.execute('SELECT MAX(bid_amt) FROM bids where users_userid = %s', (userId,))
+        rows = cur.fetchall()
+
+        highest_bid = rows[0][0]
+
+        if bid <= highest_bid:
             response = {'status': StatusCodes['api_error'], 'results': 'bid is not higher than the current highest bid'}
             return flask.jsonify(response)
 
@@ -593,8 +606,6 @@ def get_messages(current_user, userId):
 
     return flask.jsonify(response)
 
-    
-    
 
 ## Outbid notification
 
@@ -647,6 +658,47 @@ def close_auction(current_user, auctionId):
     return flask.jsonify(response)
 
 ## Cancel auction
+## PUT http://localhost:8080/auction/{auctionId}/cancel
+## req: none
+## res: updated auction information
+@app.route('/auction/<auctionId>/cancel', methods=['PUT'])
+@token_required
+def cancel_auction(current_user, auctionId):
+    logger.info('PUT /auction/<auctionId>/cancel')
+
+    conn = db_connection()
+    cur = conn.cursor()
+
+    try:
+        # Update the auction status to "cancelled"
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S')
+        cur.execute('UPDATE auction SET auction_end = %s WHERE auctionid = %s', (current_time, auctionId))
+        conn.commit()
+
+        # Get the details of the cancelled auction
+        cur.execute('SELECT * FROM auction WHERE auctionid = %s', (auctionId,))
+        row = cur.fetchone()
+
+        # Get the users who have placed a bid on this auction
+        cur.execute('SELECT DISTINCT users_userid FROM bid WHERE auction_auctionid = %s', (auctionId,))
+        users = cur.fetchall()
+
+        # Insert a post for each user telling them the auction has cancelled
+        for user in users:
+            cur.execute('INSERT INTO post (user_id, auction_id, message) VALUES (%s, %s, %s)', (user[0], auctionId, 'The auction has been cancelled.'))
+            conn.commit()
+
+        response = {'status': StatusCodes['success'], 'results': 'Auction cancelled successfully.'}
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(f'PUT /auction/<auctionId>/cancel - error: {error}')
+        response = {'status': StatusCodes['internal_error'], 'errors': str(error)}
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+    return flask.jsonify(response)
 
 
 
