@@ -159,9 +159,6 @@ def add_users():
     logger.debug(f'POST /user - payload: {payload}')
 
     # do not forget to validate every argument, e.g.,:
-    if 'userid' not in payload:
-        response = {'status': StatusCodes['api_error'], 'results': 'userid value not in payload'}
-        return flask.jsonify(response)
     if 'password' not in payload:
         response = {'status': StatusCodes['api_error'], 'results': 'password value not in payload'}
         return flask.jsonify(response)
@@ -170,15 +167,15 @@ def add_users():
         return flask.jsonify(response)
 
     # parameterized queries, good for security and performance
-    statement = 'INSERT INTO users (userid, password, usertype) VALUES (%s, %s, %s)'
-    values = (payload['userid'], payload['password'], payload['usertype'])
+    statement = 'INSERT INTO users (password, usertype) VALUES (%s, %s)'
+    values = (payload['password'], payload['usertype'])
 
     try:
         cur.execute(statement, values)
 
         # commit the transaction
         conn.commit()
-        response = {'status': StatusCodes['success'], 'results': f'Inserted users {payload["userid"]}'}
+        response = {'status': StatusCodes['success'], 'results': f'Inserted user'}
 
     except (Exception, psycopg2.DatabaseError) as error:
         logger.error(f'POST /users - error: {error}')
@@ -225,9 +222,17 @@ def add_auction():
     if 'items_itemid' not in payload:
         response = {'status': StatusCodes['api_error'], 'results': 'items_itemid value not in payload'}
         return flask.jsonify(response)
+
+    cur.execute('SELECT usertype FROM users WHERE userid = %s', (payload['users_userid'],))
+    user_type = cur.fetchone()
+
+    if user_type[0] != 'seller':
+        response = {'status': StatusCodes['api_error'], 'results': 'Only sellers can update auctions'}
+        return flask.jsonify(response)
+        
     # parameterized queries, good for security and performance
-    statement = 'INSERT INTO auction (auctiontitle, auction_end, sellerdesc, users_userid, items_itemid, auction_winner) VALUES (%s, %s, %s, %s, %s, NULL)'
-    values = (payload['auctiontitle'], payload['auction_end'], payload['sellerdesc'], payload['users_userid'], payload['items_itemid'], payload['auction_winner'])
+    statement = 'INSERT INTO auction (auctiontitle, auction_end, sellerdesc, users_userid, items_itemid, auction_winner) VALUES (%s, %s, %s, %s, %s, %s)'
+    values = (payload['auctiontitle'], payload['auction_end'], payload['sellerdesc'], payload['users_userid'], payload['items_itemid'], 0)
 
     try:
         cur.execute(statement, values)
@@ -271,7 +276,8 @@ def get_all_auctions(current_user):
         for row in rows:
             logger.debug(row)
             content = {'auctionid': row[0], 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3],'users_userid': row[4],'items_itemid': row[5], 'auction_winner': row[6]}
-            Results.append(content)  # appending to the payload to be returned
+            if row[6] == 0 and row[2] > datetime.now():
+                Results.append(content)  # appending to the payload to be returned
 
         response = {'status': StatusCodes['success'], 'results': Results}
 
@@ -306,7 +312,8 @@ def get_auctions(current_user, keyword):
         for row in rows:
             logger.debug(row)
             content = {'auctionid': row[0], 'auctiontitle': row[1], 'auction_end': row[2], 'sellerdesc': row[3],'users_userid': row[4],'items_itemid': row[5], 'auction_winner': row[6]}
-            Results.append(content)  # appending to the payload to be returned
+            if row[6] == 0 and row[2] > datetime.now():
+                Results.append(content)  # appending to the payload to be returned
 
         response = {'status': StatusCodes['success'], 'results': Results}
 
@@ -417,7 +424,7 @@ def place_bid(auctionId, bid, userId):
         if len(rows) == 0:
             response = {'status': StatusCodes['api_error'], 'results': 'auction does not exist'}
             return flask.jsonify(response)
-        if rows[0][6] is not None:
+        if rows[0][4] != 0:
             response = {'status': StatusCodes['api_error'], 'results': 'auction winner already declared'}
             return flask.jsonify(response)
         cur.execute('SELECT auction_end FROM auction WHERE auctionid = %s', (auctionId,))
@@ -438,14 +445,8 @@ def place_bid(auctionId, bid, userId):
             response = {'status': StatusCodes['api_error'], 'results': 'auction does not have any bids'}
             return flask.jsonify(response)
 
-        cur.execute('SELECT * FROM bids where bid_amt < %s and auction_auctionid = %s', (bid, auctionId))
-        rows = cur.fetchall()
 
-        if len(rows) == 0:
-            response = {'status': StatusCodes['api_error'], 'results': 'bid is not higher than the current highest bid'}
-            return flask.jsonify(response)
-
-        cur.execute('SELECT MAX(bid_amt) FROM bids where users_userid = %s', (userId,))
+        cur.execute('SELECT MAX(bid_amt) FROM bids where auction_auctionid = %s', (auctionId,))
         rows = cur.fetchall()
 
         highest_bid = rows[0][0]
@@ -466,7 +467,7 @@ def place_bid(auctionId, bid, userId):
         cur.execute('SELECT DISTINCT users_userid FROM bids WHERE auction_auctionid = %s AND users_userid != %s', (auctionId, userId))
         users = cur.fetchall()
         for user in users:
-            cur.execute('INSERT INTO posts (users_userid, auction_auctionid, post) VALUES (%s, %s, %s)', (user[0], auctionId, f'A higher bid of {bid} has been placed on auction {auctionId}'))  # Concatenate string values properly
+            cur.execute('INSERT INTO posts (users_userid, auction_auctionid, post) VALUES (%s, %s, %s)', (userId, auctionId, f'A higher bid of {bid} has been placed on auction {auctionId}'))  # Concatenate string values properly
             conn.commit()
 
     except (Exception, psycopg2.DatabaseError) as error:
@@ -506,9 +507,6 @@ def edit_auction(current_user, auctionId, userId):
     if 'sellerdesc' not in payload:
         response = {'status': StatusCodes['api_error'], 'results': 'sellerdesc value not in payload'}
         return flask.jsonify(response)
-    if 'users_userid' not in payload:
-        response = {'status': StatusCodes['api_error'], 'results': 'users_userid value not in payload'}
-        return flask.jsonify(response)
     if 'items_itemid' not in payload:
         response = {'status': StatusCodes['api_error'], 'results': 'items_itemid value not in payload'}
         return flask.jsonify(response)
@@ -533,8 +531,8 @@ def edit_auction(current_user, auctionId, userId):
     ostatement = 'INSERT INTO old_auction (auctionid, auctiontitle, auction_end, sellerdesc, users_userid, items_itemid) VALUES (%s, %s, %s, %s, %s, %s)'
     ovalues = (auctionId, oauction_title, oauction_end, osellerdesc, ousers_userid, oitems_itemid)
 
-    statement = 'UPDATE auction SET auctiontitle = %s, auction_end = %s, sellerdesc = %s, users_userid = %s, items_itemid = %s WHERE auctionid = %s'
-    values = (payload['auctiontitle'], payload['auction_end'], payload['sellerdesc'], payload['users_userid'], payload['items_itemid'], auctionId)
+    statement = 'UPDATE auction SET auctiontitle = %s, auction_end = %s, sellerdesc = %s, items_itemid = %s WHERE auctionid = %s'
+    values = (payload['auctiontitle'], payload['auction_end'], payload['sellerdesc'], payload['items_itemid'], auctionId)
 
     try:
         cur.execute(ostatement, ovalues)
@@ -625,7 +623,7 @@ def get_messages(current_user, userId):
                 cur.execute('SELECT * FROM posts WHERE auction_auctionid = %s', (auction[0],))
                 rows = cur.fetchall()
                 for row in rows:
-                    content = {'post_type': 'Posts in Auctions I am Active in', 'postid': row[0], 'post': row[1], 'auction_auctionid': row[3]}
+                    content = {'post_type': 'Posts in Auctions I am Active in', 'postid': row[0], 'post': row[1], 'auction_auctionid': row[3], 'users_userid': row[2]}
                     Results.append(content)
         
         if user_type == 'seller':
@@ -635,7 +633,7 @@ def get_messages(current_user, userId):
                 cur.execute('SELECT * FROM posts WHERE auction_auctionid = %s', (auction[0],))
                 rows = cur.fetchall()
                 for row in rows:
-                    content = {'post_type': 'Posts in Auctions I am Hosting', 'postid': row[0], 'post': row[1], 'auction_auctionid': row[3]}
+                    content = {'post_type': 'Posts in Auctions I am Hosting', 'postid': row[0], 'post': row[1], 'auction_auctionid': row[3], 'users_userid': row[2]}
                     Results.append(content)
 
     except (Exception, psycopg2.DatabaseError) as error:
@@ -678,11 +676,11 @@ def close_auction(current_user, auctionId, userId):
         current_datetime = time.strftime('%Y-%m-%d %H:%M:%S')
 
         # Get the highest bid in the auction
-        cur.execute('SELECT MAX(bid) FROM bids WHERE auctionid = %s', (auctionId,))
+        cur.execute('SELECT MAX(bid_amt) FROM bids WHERE auction_auctionid = %s', (auctionId,))
         highest_bid = cur.fetchone()[0]
 
         # Get the user who placed the highest bid
-        cur.execute('SELECT userid FROM bids WHERE auctionid = %s AND bid = %s', (auctionId, highest_bid))
+        cur.execute('SELECT users_userid FROM bids WHERE auction_auctionid = %s AND bid_amt = %s', (auctionId, highest_bid))
         winner = cur.fetchone()[0]
 
         # Update the auction with the winner
