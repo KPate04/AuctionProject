@@ -1,0 +1,382 @@
+{
+	"info": {
+		"_postman_id": "0b451bb0-95e2-4df0-bdb4-72315c62a047",
+		"name": "Auction Project",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "34602773"
+	},
+	"item": [
+		{
+			"name": "http://localhost:8080/users",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"password\": \"test\",\r\n    \"usertype\": \"buyer\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/users",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"users"
+					]
+				},
+				"description": "Sign-up"
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8080/login",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"uuid": "60f7b36c-c079-49c5-a5d2-45a9ab475a2d"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"userid\": \"1\", \r\n    \"password\": \"buyer1\"\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/login",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"login"
+					]
+				},
+				"description": "User authentication"
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8080/auction",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"auctiontitle\": \"Test Auction\",\r\n    \"auction_end\": \"2024-05-09 20:00:00\",\r\n    \"sellerdesc\": \"My description\",\r\n    \"users_userid\": 1,\r\n    \"items_itemid\": 1\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/auction",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"auction"
+					]
+				},
+				"description": "Create a new auction"
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8080/auctions",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "access-token",
+						"value": "1518028070",
+						"uuid": "5d06f135-3639-461e-8fb8-e71f91f9bfb5"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/auctions",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"auctions"
+					]
+				},
+				"description": "List all existing auctions"
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8080/auctions/Kite",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "access-token",
+						"value": "1518028070",
+						"uuid": "238d14e9-f12e-4cd6-986d-76f2e007c045"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/auctions/Kite",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"auctions",
+						"Kite"
+					]
+				},
+				"description": "Search existing auctions"
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8080/auction/1",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "access-token",
+						"value": "1518028070",
+						"uuid": "284673fd-3cf6-43c0-ad0a-a2aa0ad7e8cf"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/auction/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"auction",
+						"1"
+					]
+				},
+				"description": "Retrieve details of an auction"
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8080/auctions/user/1",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "access-token",
+						"value": "1518028070",
+						"uuid": "d6758f52-37d7-4da3-ab5a-4f6667d7fc94"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/auctions/user/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"auctions",
+						"user",
+						"1"
+					]
+				},
+				"description": "List all auctions in which the user has activity"
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8080/auction/1/20.00/1",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/auction/1/20.00/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"auction",
+						"1",
+						"20.00",
+						"1"
+					]
+				},
+				"description": "Place a bid in an auction"
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8080/auction/1/1",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "access-token",
+						"value": "1213363428",
+						"uuid": "693d9826-8cb6-4b4f-94ab-abc64232b4a8"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"auctiontitle\": \"Update Auction 1\",\r\n    \"auction_end\": \"2024-05-09 20:00:00\",\r\n    \"sellerdesc\": \"My description\",\r\n    \"items_itemid\": 1\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/auction/1/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"auction",
+						"1",
+						"1"
+					]
+				},
+				"description": "Edit properties of an auction"
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8080/auction/1/posts",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"post\": \"This is my post\",\r\n    \"users_userid\": \"1\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/auction/1/posts",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"auction",
+						"1",
+						"posts"
+					]
+				},
+				"description": "Write a message on an auction's board"
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8080/inbox/1",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "access-token",
+						"value": "1213363428",
+						"uuid": "8c59da72-d4e6-440a-8d35-06f4b8df5662"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/inbox/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"inbox",
+						"1"
+					]
+				},
+				"description": "Immediate delivery of messages to users"
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8080/auction/1/close/1",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "access-token",
+						"value": "1213363428",
+						"uuid": "2df8304c-8c81-4501-8e27-4fd7f564281a"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/auction/1/close/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"auction",
+						"1",
+						"close",
+						"1"
+					]
+				},
+				"description": "Close an auction"
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:8080/auction/3/cancel/1",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "access-token",
+						"value": "1391366416",
+						"uuid": "3089ec08-ddc8-4b87-8e9c-c448416e23b4"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/auction/3/cancel/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"auction",
+						"3",
+						"cancel",
+						"1"
+					]
+				},
+				"description": "Cancel an auction"
+			},
+			"response": []
+		}
+	]
+}
